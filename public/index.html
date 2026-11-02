@@ -1,55 +1,146 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WinGo 30S Demo</title>
+<title>WinGo 30S</title>
 <style>
-body{background:#351516;color:white;font-family:Arial;text-align:center;padding:15px}
-.box{background:#572426;padding:20px;border-radius:15px;margin:15px 0}
-h1{color:#ffb5a5}
-.timer{font-size:45px;color:#ffd080}
-.number{font-size:55px;font-weight:bold}
-table{width:100%;color:white}
-td,th{padding:10px;border-bottom:1px solid #855}
+*{box-sizing:border-box}
+body{
+ margin:0;background:#211b50;color:white;
+ font-family:Arial,sans-serif;padding:16px;
+}
+h1{text-align:center;color:#ffb4a7;font-size:30px}
+.box{
+ background:#35296f;padding:22px 14px;
+ border-radius:18px;margin:16px 0;
+ box-shadow:0 4px 12px #0002;
+}
+.label{text-align:center;font-size:19px}
+.period{
+ text-align:center;font-size:22px;font-weight:bold;
+ margin:18px 0;overflow-wrap:anywhere;
+}
+.timer{text-align:center;font-size:43px;color:#ffd080}
+.number{text-align:center;font-size:65px;font-weight:bold}
+.result{text-align:center;font-size:26px;font-weight:bold;margin:14px}
+.colors{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.color{
+ padding:14px 4px;border-radius:12px;
+ font-weight:bold;text-align:center
+}
+.green{background:#16b66b}
+.red{background:#e13d4a}
+.violet{background:#a34bea}
+h3{text-align:center;font-size:23px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+th,td{padding:13px 9px;border-bottom:1px solid #655a91;text-align:center}
+th{background:#45398b}
+td{font-size:14px}
+.note{font-size:12px;color:#d6d0ff;text-align:center}
 </style>
 </head>
 <body>
-<h1>WinGo 30S Demo</h1>
+
+<h1>WinGo 30S</h1>
+
 <div class="box">
-<div>Period Number</div>
-<h2 id="period">Loading...</h2>
-<div class="timer" id="timer">30</div>
+ <div class="label">Period Number</div>
+ <div class="period" id="period">Loading...</div>
+ <div class="label">Time Remaining</div>
+ <div class="timer" id="timer">30</div>
 </div>
+
 <div class="box">
-<div>Number</div>
-<div class="number" id="number">-</div>
-<h2 id="color">-</h2>
-<h2 id="size">-</h2>
+ <div class="label">Number</div>
+ <div class="number" id="number">-</div>
+ <div class="result" id="color">-</div>
+ <div class="result" id="size">-</div>
+ <div class="colors">
+  <div class="color green">Green</div>
+  <div class="color violet">Violet</div>
+  <div class="color red">Red</div>
+ </div>
 </div>
+
 <div class="box">
-<h3>Game History</h3>
-<table>
-<thead><tr><th>Period</th><th>Number</th><th>Color</th><th>Size</th></tr></thead>
-<tbody id="history"></tbody>
-</table>
+ <h3>Game History</h3>
+ <div class="tablewrap">
+  <table>
+   <thead>
+    <tr>
+     <th>Period</th>
+     <th>Number</th>
+     <th>Color</th>
+     <th>Big/Small</th>
+    </tr>
+   </thead>
+   <tbody id="history">
+    <tr><td colspan="4">Loading history...</td></tr>
+   </tbody>
+  </table>
+ </div>
+ <p class="note" id="status">Connecting to server...</p>
 </div>
+
 <script>
-async function update(){
-try{
-const d=await fetch('/api/current').then(r=>r.json());
-document.getElementById('period').textContent=d.period;
-document.getElementById('timer').textContent=Math.ceil(d.remainingMs/1000);
-document.getElementById('number').textContent=d.result.number;
-document.getElementById('color').textContent=d.result.color;
-document.getElementById('size').textContent=d.result.size;
-const h=await fetch('/api/history?limit=20').then(r=>r.json());
-document.getElementById('history').innerHTML=h.history.map(x=>
-`<tr><td>${x.period}</td><td>${x.number}</td><td>${x.color}</td><td>${x.size}</td></tr>`
-).join('');
-}catch(e){}
+const $ = id => document.getElementById(id);
+
+function escapeHTML(value) {
+ return String(value).replace(/[&<>"']/g, ch => ({
+  '&':'&amp;','<':'&lt;','>':'&gt;',
+  '"':'&quot;',"'":'&#39;'
+ })[ch]);
 }
+
+function renderResult(r) {
+ $('period').textContent = r.period;
+ $('number').textContent = r.number;
+ $('color').textContent = r.color;
+ $('size').textContent = r.size;
+
+ $('number').style.color =
+  r.color === 'Green' ? '#27df91' :
+  r.color === 'Red' ? '#ff646b' : '#d5a0ff';
+
+ $('color').style.color =
+  r.color === 'Green' ? '#27df91' :
+  r.color === 'Red' ? '#ff646b' : '#d5a0ff';
+}
+
+async function update() {
+ try {
+  const response = await fetch('/api/current');
+  if (!response.ok) throw new Error('Server error');
+  const d = await response.json();
+
+  renderResult(d.result);
+  $('timer').textContent =
+   String(Math.ceil(d.remainingMs / 1000)).padStart(2,'0');
+
+  const hr = await fetch('/api/history?limit=50');
+  if (!hr.ok) throw new Error('History error');
+  const h = await hr.json();
+
+  $('history').innerHTML = h.history.map(x => `
+   <tr>
+    <td>${escapeHTML(x.period)}</td>
+    <td>${escapeHTML(x.number)}</td>
+    <td>${escapeHTML(x.color)}</td>
+    <td>${escapeHTML(x.size)}</td>
+   </tr>
+  `).join('') || '<tr><td colspan="4">No history yet</td></tr>';
+
+  $('status').textContent = 'Server connected';
+ } catch (e) {
+  $('status').textContent = 'Server connection error. Please retry.';
+ }
+}
+
 update();
-setInterval(update,1000);
+setInterval(update, 1000);
 </script>
 </body>
 </html>
